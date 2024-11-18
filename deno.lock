@@ -11,8 +11,11 @@
     "jsr:@std/path@0.217": "0.217.0",
     "jsr:@std/path@0.221": "0.221.0",
     "npm:julian@*": "0.2.0",
+    "npm:julian@0.2.0": "0.2.0",
     "npm:pluralize@*": "8.0.0",
-    "npm:uuid@*": "11.0.3"
+    "npm:pluralize@8.0.0": "8.0.0",
+    "npm:uuid@*": "11.0.3",
+    "npm:uuid@11.0.3": "11.0.3"
   },
   "jsr": {
     "@db/sqlite@0.11.1": {

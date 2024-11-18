@@ -1,4 +1,4 @@
-import Flatter from "./flatter.js";
+import Flatter from "./Flatter.ts";
 
 Flatter.attach("test.sqlite")
 
