@@ -1,0 +1,5 @@
+{
+    "name": "@jamesaduncan/flatter",
+    "version": "0.0.1",
+    "exports": "./flatter.js"
+  }
