@@ -1,7 +1,7 @@
 import { Database } from "jsr:@db/sqlite@0.11";
-import pluralize from "npm:pluralize";
-import julian from "npm:julian";
-import { v4 as uuidv4, validate as uuidValidate } from 'npm:uuid';
+import pluralize from "npm:pluralize@8.0.0";
+import julian from "npm:julian@0.2.0";
+import { v4 as uuidv4, validate as uuidValidate } from 'npm:uuid@11.0.3';
 
 let Store;
 
