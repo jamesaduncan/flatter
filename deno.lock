@@ -140,10 +140,5 @@
     "https://deno.land/x/deno_plural@2.0.0/src/rules/en.ts": "78baa1ea1bde89f23ff5080b6721b49c7e33f0abf8013f0a6b34ecba7ac7a63c",
     "https://deno.land/x/deno_plural@2.0.0/src/types.ts": "9382d30f8cb2c0875a9021fb152323587f905b4e71510dbccea25af7c854ee2e",
     "https://deno.land/x/deno_plural@2.0.0/src/utils.ts": "d7db0793a17f48156ceb5a1a6efc6d25bea1c243e4ea02a7ccc411902ba26bf5"
-  },
-  "workspace": {
-    "dependencies": [
-      "npm:@deepkit/framework@^1.0.1-alpha.155"
-    ]
   }
 }

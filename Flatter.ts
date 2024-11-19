@@ -8,7 +8,7 @@ DBConnection.run('PRAGMA FOREIGN_KEY = ON;')
 
 interface IObjectLoadCache {
     toplevel : string;
-    [key: string] : string;
+    [key: string] : boolean;
 }
 
 interface IDBTypeConversion {
@@ -165,6 +165,7 @@ class Flatter {
         console.log(sql);
         const values = this.dbValues( cache );
         console.log(values);
+        if ( cache ) cache[ this.uuid ] = true;
         return true;
     }
 
@@ -186,13 +187,24 @@ Flatter.declareDBType('DATETIME', {
 Flatter.declareDBType('OBJECT', {
     toPlaceholder: 'json(?)',
     toDBValue    : (e: object, cache : IObjectLoadCache = { toplevel: "" }) : string => {
+        /* This replacer function checks to see if what we're trying to flatten is an object.
+           If it is, then we check to see if its an instance of Flatter. If it is, then we need
+           to be clever. If its the toplevel object, we just return it just as it is. If it isn't
+           then first of all we need to replace it with a placeholder, that provides the information
+           needed - essentially the class and the uuid - to retrieve the object when we
+           deserialize later on. 
+
+           We'll also need to check to see if we've encoutered this object before. If we've not, then
+           we call save on it before returning the placeholder. Otherwise, we just return the placeholder.
+        */
         const replacer = function(_key : string, value : unknown ) {                        
             if ( typeof(value) == 'object') {
                 if ( value instanceof Flatter ) {
                     const storable = (value as Storable);
                     if ( cache.toplevel == storable.uuid ) return value;
-
-                    return { class: (value.constructor as ObjectConstructor).name, uuid: storable.uuid};
+                    const placeholder = { class: (value.constructor as ObjectConstructor).name, uuid: storable.uuid};
+                    if ( !cache[ storable.uuid ] ) value.save( cache );
+                    return placeholder;
                 }
 
                 else return value;
