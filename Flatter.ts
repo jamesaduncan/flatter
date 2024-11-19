@@ -6,6 +6,11 @@ let DBConnection = new Database("flatter.sqlite");
 DBConnection.run('PRAGMA journal_mode = WAL;')        
 DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
 
+interface IObjectLoadCache {
+    toplevel : string;
+    [key: string] : string;
+}
+
 interface IDBTypeConversion {
     toPlaceholder? : string | Function;
     toDBValue? : string | Function;
@@ -25,6 +30,10 @@ interface IRowInfo {
     pk : number;
 }
 
+interface ITables {
+    [key : string] : ITableInfo;
+}
+
 interface ITableInfo {
     [key : string] : IRowInfo;
 }
@@ -33,6 +42,7 @@ interface Storable {
     uuid   : string;
 
     save() : boolean;
+    dbValues( cache? : IObjectLoadCache ) : string[];
 }
 
 /* This defines the static interface for Flatter */
@@ -40,7 +50,7 @@ interface Loadable {
     new() : Storable;
 
     SQLDefinition : string;
-    tableInfo : ITableInfo;
+    tableInfo : ITables;
     DBTypeConversions : IDBTypeConversions;
 
     get tablename() : string;
@@ -63,7 +73,7 @@ class Flatter {
 
     static SQLDefinition = "";
     static DBTypeConversions : IDBTypeConversions = {};
-    static tableInfo : ITableInfo = ({} as ITableInfo);
+    static tableInfo : ITables = ({} as ITables);
 
     private static DBTypes = {};
 
@@ -81,6 +91,7 @@ class Flatter {
     }
 
     static init() {
+        const typename  = this.name;
         const tablename = this.tablename;
 
         const tableDetails = DBConnection.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tablename}'`).get();
@@ -92,9 +103,10 @@ class Flatter {
         const info = DBConnection.prepare(`PRAGMA table_info(${tablename})`).all();
         info.forEach( (infoRow) => {
             const castInfo : IRowInfo = (infoRow as IRowInfo);
-            let DBType = castInfo.type;
+            const DBType = castInfo.type;
             if (!this.DBTypeConversions[ DBType ]) throw new Error(`type ${DBType} used in database is not defined in software`);
-            this.tableInfo[ castInfo.name ] = castInfo;
+            this.tableInfo[typename]||= {};
+            this.tableInfo[typename][ castInfo.name ] = castInfo;
         })
     }
 
@@ -103,12 +115,13 @@ class Flatter {
     }
 
     static get dbColumns() : string[] {
-        return Object.keys(this.tableInfo);
+        return Object.keys(this.tableInfo[this.name]);
     }
 
     static get dbPlaceholders() : string[] {
         const theClass = (this as Loadable);
-        const tableInfoValues = Object.values(this.tableInfo);
+        const typename = this.name;
+        const tableInfoValues = Object.values(this.tableInfo[typename]);
         return tableInfoValues.map( (e: IRowInfo) => {
             const placeholder = theClass.DBTypeConversions[ e.type ].toPlaceholder;
             if (!placeholder) return '?';
@@ -120,35 +133,42 @@ class Flatter {
         })
     }
 
-    get dbValues() : string[] {
+    dbValues( cache? : IObjectLoadCache ) : string[] {
         const theClass = (this.constructor as Loadable);
         const tableInfo = theClass.tableInfo;
-        return Object.values( tableInfo ).map( ( row : IRowInfo ) : string => {
+
+        if (!cache) {
+            cache = {
+                toplevel: this.uuid
+            };
+        }
+
+        return Object.values( tableInfo[theClass.name] ).map( ( row : IRowInfo ) : string => {            
             const value = Reflect.get(this, row.name);
             const toDBValue = theClass.DBTypeConversions[row.type].toDBValue;
-            console.log(`toDBValue for ${row.name} is`, toDBValue);
-            console.log(`value for ${row.name} is `,value)
             if (!toDBValue) {
                 return (value as string);
             }
             if (toDBValue) {
                 if ( typeof(toDBValue) == 'string' ) return toDBValue;
-                return toDBValue( value );
+                return toDBValue( value, cache );
             }
             return '';
         })
     }
 
-    save(): boolean {        
+    save( cache? : IObjectLoadCache ): boolean {
         const tablename       = (this.constructor as Loadable).tablename;
         const columns         = (this.constructor as Loadable).dbColumns;
         const dbPlaceholders  = (this.constructor as Loadable).dbPlaceholders;
         const sql = `INSERT OR REPLACE INTO ${tablename} (${columns.join(", ")}) VALUES(${dbPlaceholders.join(", ")})`
-        console.log(sql, this.dbValues);
+        console.log(sql);
+        const values = this.dbValues( cache );
+        console.log(values);
         return true;
     }
 
-    public static load( uuid: string, cache? : object) : Storable {
+    public static load( _uuid: string, _cache? : object) : Storable {
         return new this();
     }
 
@@ -161,11 +181,28 @@ class Flatter {
 Flatter.declareDBType('UUID', {});
 Flatter.declareDBType('TEXT', {});
 Flatter.declareDBType('DATETIME', {
-    toDBValue    : (e : object ) : string => { return julian( e ) },
+    toDBValue    : (e : object, _cache : IObjectLoadCache = { toplevel: "" }) : string => { return julian( e ) },
 });
 Flatter.declareDBType('OBJECT', {
     toPlaceholder: 'json(?)',
-    toDBValue    : (e: object) : string => { return JSON.stringify(e) }
+    toDBValue    : (e: object, cache : IObjectLoadCache = { toplevel: "" }) : string => {
+        const replacer = function(_key : string, value : unknown ) {                        
+            if ( typeof(value) == 'object') {
+                if ( value instanceof Flatter ) {
+                    const storable = (value as Storable);
+                    if ( cache.toplevel == storable.uuid ) return value;
+
+                    return { class: (value.constructor as ObjectConstructor).name, uuid: storable.uuid};
+                }
+
+                else return value;
+            }
+
+            return value;
+        };
+
+        return JSON.stringify(e,replacer);            
+    }
 })
 
 export default Flatter;

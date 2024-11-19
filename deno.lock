@@ -3,6 +3,7 @@
   "specifiers": {
     "jsr:@db/sqlite@0.11": "0.11.1",
     "jsr:@denosaurs/plug@1": "1.0.6",
+    "jsr:@dx/reflect@*": "0.2.14",
     "jsr:@std/assert@0.217": "0.217.0",
     "jsr:@std/assert@0.221": "0.221.0",
     "jsr:@std/encoding@0.221": "0.221.0",
@@ -10,6 +11,7 @@
     "jsr:@std/fs@0.221": "0.221.0",
     "jsr:@std/path@0.217": "0.217.0",
     "jsr:@std/path@0.221": "0.221.0",
+    "npm:@deepkit/type@*": "1.0.1-alpha.155_@deepkit+core@1.0.1-alpha.154",
     "npm:julian@*": "0.2.0",
     "npm:julian@0.2.0": "0.2.0",
     "npm:pluralize@*": "8.0.0",
@@ -33,6 +35,9 @@
         "jsr:@std/fs",
         "jsr:@std/path@0.221"
       ]
+    },
+    "@dx/reflect@0.2.14": {
+      "integrity": "53e1cb54e25170f43d90966679fcd7d6e0d27e23f4f1c869330d339576f446be"
     },
     "@std/assert@0.217.0": {
       "integrity": "c98e279362ca6982d5285c3b89517b757c1e3477ee9f14eb2fdf80a45aaa9642"
@@ -67,14 +72,78 @@
     }
   },
   "npm": {
+    "@deepkit/core@1.0.1-alpha.154": {
+      "integrity": "sha512-wgPcfHAs0ITqbP6IzlK3yEocGhNtO2n+AQnwzllkMVf/kBS2yCjuZnbBX6mEwwOLT7dgoK0Xk3UFN8loZNj8mA==",
+      "dependencies": [
+        "dot-prop",
+        "to-fast-properties"
+      ]
+    },
+    "@deepkit/type-spec@1.0.1-alpha.116": {
+      "integrity": "sha512-8LDtbhLlZTKJGocdmpB/Td5nor5Pm90i4TuZbRIJEAofuEFAXM80tT7xZZLl9AFtGJaATZd7Lv0jViwspXKvxg=="
+    },
+    "@deepkit/type@1.0.1-alpha.155_@deepkit+core@1.0.1-alpha.154": {
+      "integrity": "sha512-hVzR+D5yz2D9Bld/YE4bw8eqv7w21pV1XGqaQJWxKjaZjWiy5HVS7K1WQGzwU1ZbhDepnTlBzG6jmIM1iYn9eQ==",
+      "dependencies": [
+        "@deepkit/core",
+        "@deepkit/type-spec",
+        "@types/uuid",
+        "buffer",
+        "uuid@8.3.2"
+      ]
+    },
+    "@types/uuid@8.3.4": {
+      "integrity": "sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw=="
+    },
+    "base64-js@1.5.1": {
+      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
+    },
+    "buffer@5.7.1": {
+      "integrity": "sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==",
+      "dependencies": [
+        "base64-js",
+        "ieee754"
+      ]
+    },
+    "dot-prop@5.3.0": {
+      "integrity": "sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==",
+      "dependencies": [
+        "is-obj"
+      ]
+    },
+    "ieee754@1.2.1": {
+      "integrity": "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="
+    },
+    "is-obj@2.0.0": {
+      "integrity": "sha512-drqDG3cbczxxEJRoOXcOjtdp1J/lyp1mNn0xaznRs8+muBhgQcrnbspox5X5fOw0HnMnbfDzvnEMEtqDEJEo8w=="
+    },
     "julian@0.2.0": {
       "integrity": "sha512-rpBcYy7SiT9ogHfxcJQDLycCVGx7nTvAbu0wm3dVnpY71P7asAFT5oOOLrlsDqQYS6qenhE/NHfhtMR7AQqWSQ=="
     },
     "pluralize@8.0.0": {
       "integrity": "sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA=="
     },
+    "to-fast-properties@3.0.1": {
+      "integrity": "sha512-/wtNi1tW1F3nf0OL6AqVxGw9Tr1ET70InMhJuVxPwFdGqparF0nQ4UWGLf2DsoI2bFDtthlBnALncZpUzOnsUw=="
+    },
     "uuid@11.0.3": {
       "integrity": "sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg=="
+    },
+    "uuid@8.3.2": {
+      "integrity": "sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg=="
     }
+  },
+  "remote": {
+    "https://deno.land/x/deno_plural@2.0.0/mod.ts": "9473507398048cb24dbb37b3a220777106c69c28d573898648deb2bb84a7e131",
+    "https://deno.land/x/deno_plural@2.0.0/src/denoPlural.ts": "975dd7a85d25b44de78276d7dce93606c2cbbaa48718f5e83ba35af9e823f6f3",
+    "https://deno.land/x/deno_plural@2.0.0/src/mod.ts": "b9e42705558be387dbdd76e524b5940b09d7356ffb27a7f388d9a17084a7d9bc",
+    "https://deno.land/x/deno_plural@2.0.0/src/rules/en.ts": "78baa1ea1bde89f23ff5080b6721b49c7e33f0abf8013f0a6b34ecba7ac7a63c",
+    "https://deno.land/x/deno_plural@2.0.0/src/types.ts": "9382d30f8cb2c0875a9021fb152323587f905b4e71510dbccea25af7c854ee2e",
+    "https://deno.land/x/deno_plural@2.0.0/src/utils.ts": "d7db0793a17f48156ceb5a1a6efc6d25bea1c243e4ea02a7ccc411902ba26bf5"
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:@deepkit/framework@^1.0.1-alpha.155"
+    ]
   }
 }

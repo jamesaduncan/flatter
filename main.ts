@@ -8,9 +8,13 @@ class Address extends Flatter {
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
             street TEXT,
-            city TEXT,
+            city TEXT
         )
     `;
+
+    static {
+        this.init();
+    }
 }
 
 class User extends Flatter {
@@ -35,10 +39,8 @@ class User extends Flatter {
     }
 }
 
-import { Database } from "jsr:@db/sqlite@0.11";
-const db = new Database("test.sqlite")
-db.run('PRAGMA journal_mode = WAL;')        
-db.run('PRAGMA FOREIGN_KEY = ON;')        
+console.log("User", User.tableInfo);
+console.log("Address", Address.tableInfo)
 
 const u = new User({ username: 'james'});
 u.save();
