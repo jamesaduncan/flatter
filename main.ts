@@ -44,7 +44,7 @@ class User extends Flatter implements IUser {
     static override SQLDefinition = `
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
-            username TEXT NOT NULL,
+            username TEXT UNIQUE NOT NULL,
             created DATETIME,
             shippingAddress Address,
             flatter OBJECT,
@@ -58,12 +58,10 @@ class User extends Flatter implements IUser {
 }
 
 const theUsername = 'johndoe';
-(new User({ username: theUsername })).save();
+
 (new User({ username: 'bill'})).save();
 (new User({ username: 'brian'})).save();
-
-const u2 = User.load({username: theUsername })[0];
-console.log(u2);
+console.log( User.load({ username: 'bill'}) );
 
 /* test cases */
 
@@ -82,12 +80,18 @@ Deno.test("create user with some pre-set values", () => {
 });
 
 Deno.test("save a user", () => {
- 
+    (new User({ username: theUsername })).save();
     assert(true);
 });
 
 Deno.test("load a user", () => {
-
+    const u = User.load({username: theUsername })[0];
     assert(u);
+});
 
-})
+Deno.test("load a user with a uuid", () => {
+    const u = User.load({username: theUsername })[0];
+    const u2 = User.loadWithUUID( u.uuid );
+    assert((u as User).username == (u2 as User).username);
+});
+
