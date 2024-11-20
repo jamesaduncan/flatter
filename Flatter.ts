@@ -52,6 +52,10 @@ interface Storable {
     dbValues( cache? : TObjectLoadCache ) : string[];
 }
 
+type TTypeCache = {
+    [key : string] : Loadable;
+}
+
 /* This defines the static interface for Flatter */
 interface Loadable {
     new() : Storable;
@@ -59,15 +63,23 @@ interface Loadable {
     SQLDefinition : string;
     tableInfo : ITables;
     DBTypeConversions : TDBTypeConversions;
+    TypeCache : TTypeCache;
 
     get tablename() : string;
     get dbColumns() : string[];
     get dbPlaceholders() : string[];
 
-    load( uuid : string, cache? : object) : Storable;
+    load( criteria : object, cache? : object) : Storable[];
+    loadWithUUID( aUUID : string, cache? : object) : Storable;
+
     init() : void;
 
     useDatabase( aDatabase : Database ) : void;
+}
+
+type TProxy = {
+    class : string;
+    uuid  : string;
 }
 
 function log<This, Args extends unknown[], Return>(
@@ -101,6 +113,7 @@ class Flatter {
     static SQLDefinition = "";
     static DBTypeConversions : TDBTypeConversions = {};
     static tableInfo : ITables = ({} as ITables);
+    static TypeCache : TTypeCache = {};
 
     private static DBTypes = {};
 
@@ -119,6 +132,8 @@ class Flatter {
     static init() {
         const typename  = this.name;
         const tablename = this.tablename;
+
+        this.TypeCache[typename] = this;
 
         flog(`in init() for ${typename}`)
 
@@ -237,8 +252,48 @@ class Flatter {
         }        
     }
 
-    public static load( _uuid: string, _cache? : object) : Storable {
-        return new this();
+    @log
+    public static loadWithUUID( aUUID : string, _cache? : object) : Storable {        
+        const sql = `SELECT * FROM ${this.tablename} WHERE uuid = ?`;
+        let row = DBConnection.prepare(sql).get(aUUID);
+        if (!row) throw new Error(`no object with uuid ${aUUID} found`);
+
+        type FlatterObject = {
+            flatter : string;
+            [key : string] : unknown;
+        }
+        if ( row.flatter ) {
+            row = JSON.parse( (row as FlatterObject).flatter, (_key : string, value : unknown, _context? : string) => {
+                if ( value instanceof Object) {
+                    const theValue = (value as TProxy);
+                    if (theValue.class) {
+                        const aClass = this.TypeCache[theValue.class];
+                        return aClass.loadWithUUID( theValue.uuid )    
+                    }
+                }
+                return value;
+            });
+        }
+
+        const entries = Object.entries( (row as object) );    
+        const objectProperties = Object.fromEntries( entries.map( ([k,v]) => {
+            return [ k, {
+                writable: true,
+                enumerable: true,
+                configurable: true,
+                value: v
+            }];
+        }) );
+
+        return (Object.create(new this(), objectProperties) as Storable);
+    }
+
+    @log
+    public static load( criteria : object, _cache? : object) : Storable[] {        
+        const sql = `SELECT uuid FROM ${this.tablename}`;
+        return DBConnection.prepare(sql).all().map( (row : object) => {
+            return this.loadWithUUID( (row as Storable).uuid );
+        })
     }
 
     static declareDBType( aType : string, aDefinition : TDBTypeConversion) : void {

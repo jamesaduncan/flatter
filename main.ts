@@ -57,6 +57,12 @@ class User extends Flatter implements IUser {
     }
 }
 
+const theUsername = 'johndoe';
+const u = new User({ username: theUsername });
+u.save();
+const u2 = User.load({username: theUsername })
+console.log(u2);
+
 /* test cases */
 
 Deno.test("simple test", () => {
@@ -68,14 +74,18 @@ Deno.test("creating a user", () => {
     assert(u); // got a user
 });
 
-const theUsername = 'johndoe';
 Deno.test("create user with some pre-set values", () => {
     const u = new User({ username: theUsername });
     assertEquals(u.username, theUsername);
 });
 
 Deno.test("save a user", () => {
-    const u = new User({ username: theUsername });
-    u.save();
+ 
     assert(true);
+});
+
+Deno.test("load a user", () => {
+
+    assert(u);
+
 })
