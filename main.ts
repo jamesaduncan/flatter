@@ -1,4 +1,6 @@
 import Flatter from "./Flatter.ts";
+import { assertEquals } from "jsr:@std/assert";
+
 
 class Address extends Flatter {
     street : string = "";    
@@ -22,9 +24,9 @@ class Address extends Flatter {
 class User extends Flatter {
     username : string = "";
     created  : Date = new Date();
-
-    shippingAddress : Address = new Address();
     
+    shippingAddress : Address = new Address();
+
     static override SQLDefinition = `
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
@@ -43,3 +45,7 @@ class User extends Flatter {
 
 const u = new User({ username: 'james'});
 u.save();
+
+Deno.test("simple test", () => {
+    assertEquals(u, true)
+})
