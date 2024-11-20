@@ -4,6 +4,8 @@ import Pluralize from "jsr:@wei/pluralize";
 import julian from "npm:julian@0.2.0";
 import debug from "npm:debug";
 
+import criterion from "npm:criterion";
+
 const sqllog = debug('flatter:sql');
 const flog   = debug('flatter:main');
 
@@ -290,8 +292,10 @@ class Flatter {
 
     @log
     public static load( criteria : object, _cache? : object) : Storable[] {        
-        const sql = `SELECT uuid FROM ${this.tablename}`;
-        return DBConnection.prepare(sql).all().map( (row : object) => {
+        const query = `SELECT uuid FROM ${this.tablename}`;
+        const where = criterion( criteria );
+        const sql = [query, where.sql()].join(" ")
+        return DBConnection.prepare(sql).all( where.params() ).map( (row : object) => {
             return this.loadWithUUID( (row as Storable).uuid );
         })
     }
