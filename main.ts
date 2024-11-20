@@ -58,9 +58,11 @@ class User extends Flatter implements IUser {
 }
 
 const theUsername = 'johndoe';
-const u = new User({ username: theUsername });
-u.save();
-const u2 = User.load({username: theUsername })
+(new User({ username: theUsername })).save();
+(new User({ username: 'bill'})).save();
+(new User({ username: 'brian'})).save();
+
+const u2 = User.load({username: theUsername })[0];
 console.log(u2);
 
 /* test cases */

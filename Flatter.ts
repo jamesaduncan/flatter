@@ -294,7 +294,8 @@ class Flatter {
     public static load( criteria : object, _cache? : object) : Storable[] {        
         const query = `SELECT uuid FROM ${this.tablename}`;
         const where = criterion( criteria );
-        const sql = [query, where.sql()].join(" ")
+        const sql = [query, `WHERE ${where.sql()}`].join(" ")
+        console.log(sql)
         return DBConnection.prepare(sql).all( where.params() ).map( (row : object) => {
             return this.loadWithUUID( (row as Storable).uuid );
         })
