@@ -8,7 +8,8 @@ class Address extends Flatter {
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
             street TEXT,
-            city TEXT
+            city TEXT,
+            postcode TEXT
         )
     `;
 
@@ -28,9 +29,9 @@ class User extends Flatter {
             uuid UUID PRIMARY KEY NOT NULL,
             username TEXT NOT NULL,
             created DATETIME,
-            shippingAddress UUID,
+            shippingAddress Address,
             flatter OBJECT,
-            FOREIGN KEY(shippingAddress) REFERENCES addresses(uuid)
+            FOREIGN KEY(shippingAddress) REFERENCES Addresses(uuid)
         );
     `;
 
@@ -41,5 +42,6 @@ class User extends Flatter {
 
 const u = new User({ username: 'james'});
 u.save();
+console.log(u);
 const y = User.load( u.uuid );
 

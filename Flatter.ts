@@ -1,6 +1,6 @@
 import { Database } from "jsr:@db/sqlite@0.11";
 import julian from "npm:julian@0.2.0";
-import { plural } from "https://deno.land/x/deno_plural@2.0.0/mod.ts";
+import { plural, singular } from "https://deno.land/x/deno_plural@2.0.0/mod.ts";
 
 import { debug } from "https://deno.land/x/debug@0.2.0/mod.ts";
 
@@ -109,8 +109,7 @@ class Flatter {
         const info = DBConnection.prepare(`PRAGMA table_info(${tablename})`).all();
         info.forEach( (infoRow) => {
             const castInfo : IRowInfo = (infoRow as IRowInfo);
-            const DBType = castInfo.type;
-            if (!this.DBTypeConversions[ DBType ]) throw new Error(`type ${DBType} used in database is not defined in software`);
+            //if (!this.DBTypeConversions[ DBType ]) throw new Error(`type ${DBType} used in database is not defined in software`);
             this.tableInfo[typename]||= {};
             this.tableInfo[typename][ castInfo.name ] = castInfo;
         })
@@ -138,11 +137,18 @@ class Flatter {
         const typename = this.name;
         const tableInfoValues = Object.values(this.tableInfo[typename]);
         return tableInfoValues.map( (e: IRowInfo) => {
-            const placeholder = theClass.DBTypeConversions[ e.type ].toPlaceholder;            
-            if ( typeof(placeholder) == 'string' ) {
-                return placeholder;
+            if ( this.tableInfo[ singular( e.type )]) {
+                // this is an object type, because it is a class/
+                const placeholder = theClass.DBTypeConversions["UUID"].toPlaceholder;
+                return placeholder || '?';
+            } else {
+                const placeholder = theClass.DBTypeConversions[ e.type ].toPlaceholder;            
+                if ( typeof(placeholder) == 'string' ) {
+                    return placeholder;
+                } else {
+                    return '?';
+                }
             }
-            return '?';
         })
     }
 
