@@ -1,8 +1,8 @@
 import { Database } from "jsr:@db/sqlite@0.11";
-import julian from "npm:julian@0.2.0";
 import Pluralize from "jsr:@wei/pluralize";
 
-import { debug } from "https://deno.land/x/debug@0.2.0/mod.ts";
+import julian from "npm:julian@0.2.0";
+import debug from "npm:debug";
 
 const sqllog = debug('flatter:sql');
 const flog   = debug('flatter:main');
@@ -70,7 +70,7 @@ interface Loadable {
     useDatabase( aDatabase : Database ) : void;
 }
 
-function log<This, Args extends any[], Return>(
+function log<This, Args extends unknown[], Return>(
     target: (this: This, ...args: Args) => Return,
     context: ClassMethodDecoratorContext<
       This,
@@ -112,9 +112,8 @@ class Flatter {
         return Pluralize(this.name);
     }
 
-    constructor( aTemplate? : object ) {
-        this.uuid = crypto.randomUUID();
-        Object.assign(this, aTemplate);
+    constructor() {
+        this.uuid = crypto.randomUUID();        
     }
 
     static init() {

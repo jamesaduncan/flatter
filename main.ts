@@ -1,5 +1,5 @@
 import Flatter from "./Flatter.ts";
-import { assertEquals } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 
 
 class Address extends Flatter {
@@ -21,11 +21,25 @@ class Address extends Flatter {
     }
 }
 
-class User extends Flatter {
+interface IUser {
+    username : string;
+    created?  : Date;
+
+    shippingAddress? : Address;
+}
+
+class User extends Flatter implements IUser {
     username : string = "";
     created  : Date = new Date();
     
     shippingAddress : Address = new Address();
+
+    constructor( template? : IUser) {
+        super();
+        if (template) {
+            if (template.username) this.username = template.username
+        }
+    }
 
     static override SQLDefinition = `
         CREATE TABLE ${this.tablename} (
@@ -43,9 +57,25 @@ class User extends Flatter {
     }
 }
 
-const u = new User({ username: 'james'});
-u.save();
+/* test cases */
 
 Deno.test("simple test", () => {
-    assertEquals(u, true)
+    assert(true); // this is true
+});
+
+Deno.test("creating a user", () => {
+    const u = new User();
+    assert(u); // got a user
+});
+
+const theUsername = 'johndoe';
+Deno.test("create user with some pre-set values", () => {
+    const u = new User({ username: theUsername });
+    assertEquals(u.username, theUsername);
+});
+
+Deno.test("save a user", () => {
+    const u = new User({ username: theUsername });
+    u.save();
+    assert(true);
 })
