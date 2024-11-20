@@ -1,11 +1,11 @@
 import { Database } from "jsr:@db/sqlite@0.11";
 import julian from "npm:julian@0.2.0";
-import { plural, singular } from "https://deno.land/x/deno_plural@2.0.0/mod.ts";
+import Pluralize from "jsr:@wei/pluralize";
 
 import { debug } from "https://deno.land/x/debug@0.2.0/mod.ts";
 
-const sqllog = debug('sql');
-const flog   = debug('flatter');
+const sqllog = debug('flatter:sql');
+const flog   = debug('flatter:main');
 
 let DBConnection = new Database("flatter.sqlite");
 DBConnection.run('PRAGMA journal_mode = WAL;')        
@@ -70,6 +70,25 @@ interface Loadable {
     useDatabase( aDatabase : Database ) : void;
 }
 
+function log<This, Args extends any[], Return>(
+    target: (this: This, ...args: Args) => Return,
+    context: ClassMethodDecoratorContext<
+      This,
+      (this: This, ...args: Args) => Return
+    >
+  ) {
+    const methodName = String(context.name);
+  
+    function replacementMethod(this: This, ...args: Args): Return {
+      flog(`Entering method '${methodName}'.`);
+      const result = target.call(this, ...args);
+      flog(`Exiting method '${methodName}'.`);
+      return result;
+    }
+  
+    return replacementMethod;
+}
+
 
 function staticImplements<T>() {
     return <U extends T>(constructor: U) => { constructor };
@@ -90,7 +109,7 @@ class Flatter {
     }
 
     static get tablename() : string {
-        return plural(this.name);
+        return Pluralize(this.name);
     }
 
     constructor( aTemplate? : object ) {
@@ -137,7 +156,7 @@ class Flatter {
         const typename = this.name;
         const tableInfoValues = Object.values(this.tableInfo[typename]);
         return tableInfoValues.map( (e: IRowInfo) => {
-            if ( this.tableInfo[ singular( e.type )]) {
+            if ( this.tableInfo[ Pluralize.singular( e.type )]) {
                 // this is an object type, because it is a class/
                 const placeholder = theClass.DBTypeConversions["UUID"].toPlaceholder;
                 return placeholder || '?';
@@ -152,6 +171,7 @@ class Flatter {
         })
     }
 
+    @log
     dbValues( cache? : TObjectLoadCache ) : string[] {
         const theClass = (this.constructor as Loadable);
         const tableInfo = theClass.tableInfo;
@@ -180,6 +200,7 @@ class Flatter {
         })
     }
 
+    @log
     save( cache? : TObjectLoadCache ): boolean {
         const tablename       = (this.constructor as Loadable).tablename;
         const columns         = (this.constructor as Loadable).dbColumns;
@@ -198,6 +219,7 @@ class Flatter {
         return true;
     }
 
+    @log
     public transact( aTransaction: () => void, name? : string ) {
         if ( !name ) name = "FLATNESTED"
         const begin    = `SAVEPOINT ${name}`;
