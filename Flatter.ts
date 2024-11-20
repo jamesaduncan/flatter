@@ -5,6 +5,7 @@ import { plural, singular } from "https://deno.land/x/deno_plural@2.0.0/mod.ts";
 import { debug } from "https://deno.land/x/debug@0.2.0/mod.ts";
 
 const sqllog = debug('sql');
+const flog   = debug('flatter');
 
 let DBConnection = new Database("flatter.sqlite");
 DBConnection.run('PRAGMA journal_mode = WAL;')        
@@ -69,6 +70,7 @@ interface Loadable {
     useDatabase( aDatabase : Database ) : void;
 }
 
+
 function staticImplements<T>() {
     return <U extends T>(constructor: U) => { constructor };
 }
@@ -100,6 +102,8 @@ class Flatter {
         const typename  = this.name;
         const tablename = this.tablename;
 
+        flog(`in init() for ${typename}`)
+
         const tableDetails = DBConnection.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tablename}'`).get();
         if (!tableDetails) {
             /* we need to set up the table */
@@ -109,7 +113,6 @@ class Flatter {
         const info = DBConnection.prepare(`PRAGMA table_info(${tablename})`).all();
         info.forEach( (infoRow) => {
             const castInfo : IRowInfo = (infoRow as IRowInfo);
-            //if (!this.DBTypeConversions[ DBType ]) throw new Error(`type ${DBType} used in database is not defined in software`);
             this.tableInfo[typename]||= {};
             this.tableInfo[typename][ castInfo.name ] = castInfo;
         })
@@ -119,9 +122,6 @@ class Flatter {
         fk_rows.forEach( (row) => {            
             this.tableInfo[typename][row.from].fk = (row as object);
         })
-
-        console.log(this.tableInfo)
-    
     }
 
     static useDatabase( aDatabase : Database ) : void {
@@ -185,28 +185,34 @@ class Flatter {
         const columns         = (this.constructor as Loadable).dbColumns;
         const dbPlaceholders  = (this.constructor as Loadable).dbPlaceholders;
         const sql = `INSERT OR REPLACE INTO ${tablename} (${columns.join(", ")}) VALUES(${dbPlaceholders.join(", ")})`
-        const values = this.dbValues( cache );
 
         const theUUID = this.uuid;
-        sqllog(sql,values)
-        const stmt = DBConnection.prepare(sql);
-        stmt.run( values );
-        if ( cache ) cache[ theUUID ] = theUUID;
+        this.transact( () => {
+            const values = this.dbValues( cache );
+            sqllog(sql,values)
+            const stmt = DBConnection.prepare(sql);
+            stmt.run( values );
+            if ( cache ) cache[ theUUID ] = theUUID;
+        }, "Flatter_save");
 
         return true;
     }
 
-    public transact( aTransaction: () => void ) {
-        sqllog('BEGIN')
-        DBConnection.exec("BEGIN");
+    public transact( aTransaction: () => void, name? : string ) {
+        if ( !name ) name = "FLATNESTED"
+        const begin    = `SAVEPOINT ${name}`;
+        const release  = `RELEASE SAVEPOINT ${name}`;
+        const rollback = `ROLLBACK TRANSACTION TO SAVEPOINT ${name}`;
+        sqllog(begin)
+        DBConnection.exec(begin);
         try {            
             aTransaction();
-            sqllog('COMMIT')
-            DBConnection.exec("COMMIT");
+            sqllog(release)
+            DBConnection.exec(release);
         } catch(e) {
             console.log(e);
-            sqllog('ROLLBACK')
-            DBConnection.exec("ROLLBACK")
+            sqllog(rollback)
+            DBConnection.exec(rollback);
         }        
     }
 

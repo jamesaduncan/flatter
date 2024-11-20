@@ -3,13 +3,14 @@ import Flatter from "./Flatter.ts";
 class Address extends Flatter {
     street : string = "";    
     city   : string  = "";
+    postcode : string = "";
 
     static override SQLDefinition = `
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
             street TEXT,
-            city TEXT,
-            postcode TEXT
+            postcode TEXT,
+            city TEXT
         )
     `;
 
@@ -42,6 +43,3 @@ class User extends Flatter {
 
 const u = new User({ username: 'james'});
 u.save();
-console.log(u);
-const y = User.load( u.uuid );
-
