@@ -6,19 +6,19 @@ let DBConnection = new Database("flatter.sqlite");
 DBConnection.run('PRAGMA journal_mode = WAL;')        
 DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
 
-interface IObjectLoadCache {
+type TObjectLoadCache = {
+    [key: string] : string;
     toplevel : string;
-    [key: string] : boolean;
 }
 
-interface IDBTypeConversion {
-    toPlaceholder? : string | Function;
-    toDBValue? : string | Function;
-    toJSValue? : string | Function;
+type TDBTypeConversion = {
+    toPlaceholder? : string;
+    toDBValue? ( e: unknown, cache? : TObjectLoadCache) : string | string;
+    toJSValue? ( e: string, cache? : TObjectLoadCache) : string | string;
 }
 
-interface IDBTypeConversions {
-    [key: string] : IDBTypeConversion;
+type TDBTypeConversions = {
+    [key: string] : TDBTypeConversion;
 }
 
 interface IRowInfo {
@@ -42,7 +42,7 @@ interface Storable {
     uuid   : string;
 
     save() : boolean;
-    dbValues( cache? : IObjectLoadCache ) : string[];
+    dbValues( cache? : TObjectLoadCache ) : string[];
 }
 
 /* This defines the static interface for Flatter */
@@ -51,7 +51,7 @@ interface Loadable {
 
     SQLDefinition : string;
     tableInfo : ITables;
-    DBTypeConversions : IDBTypeConversions;
+    DBTypeConversions : TDBTypeConversions;
 
     get tablename() : string;
     get dbColumns() : string[];
@@ -72,7 +72,7 @@ class Flatter {
     uuid: string;
 
     static SQLDefinition = "";
-    static DBTypeConversions : IDBTypeConversions = {};
+    static DBTypeConversions : TDBTypeConversions = {};
     static tableInfo : ITables = ({} as ITables);
 
     private static DBTypes = {};
@@ -123,17 +123,15 @@ class Flatter {
         const typename = this.name;
         const tableInfoValues = Object.values(this.tableInfo[typename]);
         return tableInfoValues.map( (e: IRowInfo) => {
-            const placeholder = theClass.DBTypeConversions[ e.type ].toPlaceholder;
-            if (!placeholder) return '?';
+            const placeholder = theClass.DBTypeConversions[ e.type ].toPlaceholder;            
             if ( typeof(placeholder) == 'string' ) {
                 return placeholder;
-            } else {
-                return placeholder();
             }
+            return '?';
         })
     }
 
-    dbValues( cache? : IObjectLoadCache ) : string[] {
+    dbValues( cache? : TObjectLoadCache ) : string[] {
         const theClass = (this.constructor as Loadable);
         const tableInfo = theClass.tableInfo;
 
@@ -157,7 +155,7 @@ class Flatter {
         })
     }
 
-    save( cache? : IObjectLoadCache ): boolean {
+    save( cache? : TObjectLoadCache ): boolean {
         const tablename       = (this.constructor as Loadable).tablename;
         const columns         = (this.constructor as Loadable).dbColumns;
         const dbPlaceholders  = (this.constructor as Loadable).dbPlaceholders;
@@ -165,7 +163,7 @@ class Flatter {
         console.log(sql);
         const values = this.dbValues( cache );
         console.log(values);
-        if ( cache ) cache[ this.uuid ] = true;
+        if ( cache ) cache[ this.uuid ] = this.uuid;
         return true;
     }
 
@@ -173,7 +171,7 @@ class Flatter {
         return new this();
     }
 
-    static declareDBType( aType : string, aDefinition : IDBTypeConversion) : void {
+    static declareDBType( aType : string, aDefinition : TDBTypeConversion) : void {
         const theClass = (this as Loadable);
         theClass.DBTypeConversions[ aType ] = aDefinition;
     }
@@ -182,11 +180,14 @@ class Flatter {
 Flatter.declareDBType('UUID', {});
 Flatter.declareDBType('TEXT', {});
 Flatter.declareDBType('DATETIME', {
-    toDBValue    : (e : object, _cache : IObjectLoadCache = { toplevel: "" }) : string => { return julian( e ) },
+    toDBValue    : (e : unknown, _cache : TObjectLoadCache) : string => { return julian( e ) },
 });
 Flatter.declareDBType('OBJECT', {
     toPlaceholder: 'json(?)',
-    toDBValue    : (e: object, cache : IObjectLoadCache = { toplevel: "" }) : string => {
+    toDBValue    : (e: unknown, cache : TObjectLoadCache) : string => {
+        
+        cache ||= { toplevel: "" };
+
         /* This replacer function checks to see if what we're trying to flatten is an object.
            If it is, then we check to see if its an instance of Flatter. If it is, then we need
            to be clever. If its the toplevel object, we just return it just as it is. If it isn't

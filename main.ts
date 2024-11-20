@@ -39,12 +39,7 @@ class User extends Flatter {
     }
 }
 
-console.log("User", User.tableInfo);
-console.log("Address", Address.tableInfo)
-
 const u = new User({ username: 'james'});
 u.save();
 const y = User.load( u.uuid );
 
-console.log("Created:",u);
-console.log("Loaded:",y)
