@@ -2,6 +2,10 @@ import { Database } from "jsr:@db/sqlite@0.11";
 import julian from "npm:julian@0.2.0";
 import { plural } from "https://deno.land/x/deno_plural@2.0.0/mod.ts";
 
+import { debug } from "https://deno.land/x/debug@0.2.0/mod.ts";
+
+const sqllog = debug('sql');
+
 let DBConnection = new Database("flatter.sqlite");
 DBConnection.run('PRAGMA journal_mode = WAL;')        
 DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
@@ -28,6 +32,8 @@ interface IRowInfo {
     notnull : number;
     dflt_value: unknown;
     pk : number;
+
+    fk? : object;
 }
 
 interface ITables {
@@ -108,6 +114,15 @@ class Flatter {
             this.tableInfo[typename]||= {};
             this.tableInfo[typename][ castInfo.name ] = castInfo;
         })
+
+        const fk_sql  = `PRAGMA foreign_key_list(${tablename})`;
+        const fk_rows = DBConnection.prepare(fk_sql).all();
+        fk_rows.forEach( (row) => {            
+            this.tableInfo[typename][row.from].fk = (row as object);
+        })
+
+        console.log(this.tableInfo)
+    
     }
 
     static useDatabase( aDatabase : Database ) : void {
@@ -142,8 +157,12 @@ class Flatter {
         }
 
         return Object.values( tableInfo[theClass.name] ).map( ( row : IRowInfo ) : string => {            
-            const value = Reflect.get(this, row.name);
-            const toDBValue = theClass.DBTypeConversions[row.type].toDBValue;
+            const value = Reflect.get(this, row.name);            
+            const infoRow = theClass.DBTypeConversions[row.type];
+            if (row.fk && value instanceof Flatter) {
+                return (value as Storable).uuid;
+            }
+            const toDBValue = infoRow.toDBValue;
             if (!toDBValue) {
                 return (value as string);
             }
@@ -160,11 +179,29 @@ class Flatter {
         const columns         = (this.constructor as Loadable).dbColumns;
         const dbPlaceholders  = (this.constructor as Loadable).dbPlaceholders;
         const sql = `INSERT OR REPLACE INTO ${tablename} (${columns.join(", ")}) VALUES(${dbPlaceholders.join(", ")})`
-        console.log(sql);
         const values = this.dbValues( cache );
-        console.log(values);
-        if ( cache ) cache[ this.uuid ] = this.uuid;
+
+        const theUUID = this.uuid;
+        sqllog(sql,values)
+        const stmt = DBConnection.prepare(sql);
+        stmt.run( values );
+        if ( cache ) cache[ theUUID ] = theUUID;
+
         return true;
+    }
+
+    public transact( aTransaction: () => void ) {
+        sqllog('BEGIN')
+        DBConnection.exec("BEGIN");
+        try {            
+            aTransaction();
+            sqllog('COMMIT')
+            DBConnection.exec("COMMIT");
+        } catch(e) {
+            console.log(e);
+            sqllog('ROLLBACK')
+            DBConnection.exec("ROLLBACK")
+        }        
     }
 
     public static load( _uuid: string, _cache? : object) : Storable {
