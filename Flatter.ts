@@ -12,8 +12,8 @@ DBConnection.run('PRAGMA journal_mode = WAL;')
 DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
 
 type TObjectLoadCache = {
-    [key: string] : object;
-    toplevel : string;
+    [key: string] : Storable;
+    toplevel : Storable;
 }
 
 type TDBTypeConversion = {
@@ -92,7 +92,7 @@ function log<This, Args extends unknown[], Return>(
     const methodName = String(context.name);
   
     function replacementMethod(this: This, ...args: Args): Return {
-      flog(`Entering method '${methodName}(${Deno.inspect(...args)})'.`);
+      flog(`Entering method '${methodName}(${Deno.inspect(args)})'.`);
       const result = target.call(this, ...args);
       flog(`Exiting method '${methodName}'.`);
       return result;
@@ -219,11 +219,11 @@ class Flatter {
         const sql = `INSERT OR REPLACE INTO ${tablename} (${columns.join(", ")}) VALUES(${dbPlaceholders.join(", ")})`
 
         if (!cache) {
-            cache = { toplevel: this.uuid };
-            cache[ this.uuid ] = true;
+            cache = { toplevel: this };
+            cache[ this.uuid ] = ({ uuid: this.uuid } as Storable);
         } else {
             // we've already done this.
-            if (this.uuid == cache.toplevel) return true;
+            if (this.uuid == (cache.toplevel as Storable).uuid ) return true;
             if (cache[this.uuid]) return true;
         }
 
@@ -237,7 +237,7 @@ class Flatter {
             cache[ theUUID ] = this;
         }, "Flatter_save");        
 
-        cache[ this.uuid ] = true;
+        cache[ this.uuid ] = ({ uuid: this.uuid } as Storable);
 
         return true;
     }
@@ -264,12 +264,11 @@ class Flatter {
     @log
     public static loadWithUUID( aUUID : string, cache? : object) : Storable {        
         if (!cache) cache = { toplevel: aUUID }
-        if (cache[ aUUID ]) return cache[ aUUID ];
+        if (cache[ aUUID as keyof object]) return cache[ aUUID as keyof object ];
 
         const sql = `SELECT * FROM ${this.tablename} WHERE uuid = ?`;
         let row = DBConnection.prepare(sql).get(aUUID);
         if (!row) throw new Error(`no object with uuid ${aUUID} found`);
-//        console.log(`(${aUUID}) row from DB is ${Deno.inspect(row)}`)
 
         type FlatterObject = {
             flatter : string;
@@ -277,15 +276,18 @@ class Flatter {
         }
         if ( row.flatter ) {
             row = JSON.parse( (row as FlatterObject).flatter, (_key : string, value : unknown, _context? : string) => {
-                //console.log(`(${aUUID}) parse '${_key}' ${Deno.inspect(value)} '${Deno.inspect(_context)}'`)
                 if ( value instanceof Object) {
                     const theValue = (value as TProxy);
                     const aClass = this.TypeCache[ theValue.class ];
                     if (!aClass) return value;
                     const uuid   = theValue.uuid;
                     if (uuid == aUUID) return value;
-                    cache[ theValue.uuid ] ||= aClass.loadWithUUID( theValue.uuid, cache );
-                    return cache[theValue.uuid];
+                    const cachekey = (theValue.uuid as keyof object);
+                    if ( !( cache[cachekey] )) {
+                        const toCache = aClass.loadWithUUID( theValue.uuid, cache );
+                        Reflect.set(cache, cachekey, (toCache as Storable));
+                    }
+                    return cache[cachekey];
                 }
                 return value;
             });
@@ -300,16 +302,15 @@ class Flatter {
                 value: v
             }];
         }) );
-
-        cache[ aUUID ] ||= (Object.create(new this(), objectProperties) as Storable);
-        return cache[ aUUID ];
+        Reflect.set( cache, aUUID, Object.create(new this(), objectProperties))
+        return cache[ aUUID as keyof object];
     }
 
     @log
     public static load( criteria : object, _cache? : object) : Storable[] {        
         const query = `SELECT uuid FROM ${this.tablename}`;
         const where = criterion( criteria );
-        const sql = [query, `WHERE ${where.sql()}`].join(" ")
+        const sql = [query, `WHERE ${where.sql()}`].join(" ");
         return DBConnection.prepare(sql).all( where.params() ).map( (row : object) => {
             return this.loadWithUUID( (row as Storable).uuid );
         })
@@ -341,7 +342,7 @@ Flatter.declareDBType('OBJECT', {
            we call save on it before returning the placeholder. Otherwise, we just return the placeholder.
         */
         const replacer = function(_key : string, value : unknown ) {                        
-            if ( value instanceof Flatter && e.uuid == value.uuid ) {
+            if ( value instanceof Flatter && (e as Storable).uuid == value.uuid ) {
                 return value;
             } else if (value instanceof Flatter) {
                 const proxy = { 

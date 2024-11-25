@@ -18,6 +18,5 @@ into columns, and vice versa. Or at least, I think that's true. And that's the f
 
 This is where I've got to at 2254 on 20 Nov 2024:
 
-* Nothing works if I don't have a _flatter_ column in the "root" object.
-* Nothing works if I do have a _flatter_ column in a "child" object.
+* DATETIME objects need to come out of the database as Date objects, rather than as astrings
 

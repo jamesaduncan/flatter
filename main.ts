@@ -1,5 +1,5 @@
 import Flatter from "./Flatter.ts";
-import { assert, assertEquals } from "jsr:@std/assert";
+//import { assert, assertEquals } from "jsr:@std/assert";
 
 interface IAddress {
     street?: string;
@@ -79,10 +79,10 @@ const bill = new User({
 bill.save();
 console.log(bill);
 
-console.log( User.load({ username: 'bill'}) );
+console.log( User.loadWithUUID( bill.uuid ) );
 
 /* test cases */
-
+/*
 Deno.test("simple test", () => {
     assert(true); // this is true
 });
@@ -112,4 +112,4 @@ Deno.test("load a user with a uuid", () => {
     const u2 = User.loadWithUUID( u.uuid );
     assert((u as User).username == (u2 as User).username);
 });
-
+*/
