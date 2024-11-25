@@ -1,9 +1,7 @@
 import { Database } from "jsr:@db/sqlite@0.11";
 import Pluralize from "jsr:@wei/pluralize";
-
 import julian from "npm:julian@0.2.0";
 import debug from "npm:debug";
-
 import criterion from "npm:criterion";
 
 const sqllog = debug('flatter:sql');
@@ -14,7 +12,7 @@ DBConnection.run('PRAGMA journal_mode = WAL;')
 DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
 
 type TObjectLoadCache = {
-    [key: string] : string;
+    [key: string] : object;
     toplevel : string;
 }
 
@@ -94,7 +92,7 @@ function log<This, Args extends unknown[], Return>(
     const methodName = String(context.name);
   
     function replacementMethod(this: This, ...args: Args): Return {
-      flog(`Entering method '${methodName}'.`);
+      flog(`Entering method '${methodName}(${Deno.inspect(...args)})'.`);
       const result = target.call(this, ...args);
       flog(`Exiting method '${methodName}'.`);
       return result;
@@ -188,15 +186,9 @@ class Flatter {
     }
 
     @log
-    dbValues( cache? : TObjectLoadCache ) : string[] {
+    dbValues( cache : TObjectLoadCache ) : string[] {
         const theClass = (this.constructor as Loadable);
         const tableInfo = theClass.tableInfo;
-
-        if (!cache) {
-            cache = {
-                toplevel: this.uuid
-            };
-        }
 
         return Object.values( tableInfo[theClass.name] ).map( ( row : IRowInfo ) : string => {            
             const value = Reflect.get(this, row.name);            
@@ -218,19 +210,34 @@ class Flatter {
 
     @log
     save( cache? : TObjectLoadCache ): boolean {
+        flog(`{ uuid: '${this.uuid}' }).save()`)
+
+
         const tablename       = (this.constructor as Loadable).tablename;
         const columns         = (this.constructor as Loadable).dbColumns;
         const dbPlaceholders  = (this.constructor as Loadable).dbPlaceholders;
         const sql = `INSERT OR REPLACE INTO ${tablename} (${columns.join(", ")}) VALUES(${dbPlaceholders.join(", ")})`
 
+        if (!cache) {
+            cache = { toplevel: this.uuid };
+            cache[ this.uuid ] = true;
+        } else {
+            // we've already done this.
+            if (this.uuid == cache.toplevel) return true;
+            if (cache[this.uuid]) return true;
+        }
+
         const theUUID = this.uuid;
+
         this.transact( () => {
-            const values = this.dbValues( cache );
+            const values = this.dbValues( cache );            
             sqllog(sql,values)
             const stmt = DBConnection.prepare(sql);
             stmt.run( values );
-            if ( cache ) cache[ theUUID ] = theUUID;
-        }, "Flatter_save");
+            cache[ theUUID ] = this;
+        }, "Flatter_save");        
+
+        cache[ this.uuid ] = true;
 
         return true;
     }
@@ -255,10 +262,14 @@ class Flatter {
     }
 
     @log
-    public static loadWithUUID( aUUID : string, _cache? : object) : Storable {        
+    public static loadWithUUID( aUUID : string, cache? : object) : Storable {        
+        if (!cache) cache = { toplevel: aUUID }
+        if (cache[ aUUID ]) return cache[ aUUID ];
+
         const sql = `SELECT * FROM ${this.tablename} WHERE uuid = ?`;
         let row = DBConnection.prepare(sql).get(aUUID);
         if (!row) throw new Error(`no object with uuid ${aUUID} found`);
+//        console.log(`(${aUUID}) row from DB is ${Deno.inspect(row)}`)
 
         type FlatterObject = {
             flatter : string;
@@ -266,12 +277,15 @@ class Flatter {
         }
         if ( row.flatter ) {
             row = JSON.parse( (row as FlatterObject).flatter, (_key : string, value : unknown, _context? : string) => {
+                //console.log(`(${aUUID}) parse '${_key}' ${Deno.inspect(value)} '${Deno.inspect(_context)}'`)
                 if ( value instanceof Object) {
                     const theValue = (value as TProxy);
-                    if (theValue.class) {
-                        const aClass = this.TypeCache[theValue.class];
-                        return aClass.loadWithUUID( theValue.uuid )    
-                    }
+                    const aClass = this.TypeCache[ theValue.class ];
+                    if (!aClass) return value;
+                    const uuid   = theValue.uuid;
+                    if (uuid == aUUID) return value;
+                    cache[ theValue.uuid ] ||= aClass.loadWithUUID( theValue.uuid, cache );
+                    return cache[theValue.uuid];
                 }
                 return value;
             });
@@ -287,7 +301,8 @@ class Flatter {
             }];
         }) );
 
-        return (Object.create(new this(), objectProperties) as Storable);
+        cache[ aUUID ] ||= (Object.create(new this(), objectProperties) as Storable);
+        return cache[ aUUID ];
     }
 
     @log
@@ -314,8 +329,6 @@ Flatter.declareDBType('DATETIME', {
 Flatter.declareDBType('OBJECT', {
     toPlaceholder: 'json(?)',
     toDBValue    : (e: unknown, cache : TObjectLoadCache) : string => {
-        
-        cache ||= { toplevel: "" };
 
         /* This replacer function checks to see if what we're trying to flatten is an object.
            If it is, then we check to see if its an instance of Flatter. If it is, then we need
@@ -328,19 +341,18 @@ Flatter.declareDBType('OBJECT', {
            we call save on it before returning the placeholder. Otherwise, we just return the placeholder.
         */
         const replacer = function(_key : string, value : unknown ) {                        
-            if ( typeof(value) == 'object') {
-                if ( value instanceof Flatter ) {
-                    const storable = (value as Storable);
-                    if ( cache.toplevel == storable.uuid ) return value;
-                    const placeholder = { class: (value.constructor as ObjectConstructor).name, uuid: storable.uuid};
-                    if ( !cache[ storable.uuid ] ) value.save( cache );
-                    return placeholder;
-                }
-
-                else return value;
+            if ( value instanceof Flatter && e.uuid == value.uuid ) {
+                return value;
+            } else if (value instanceof Flatter) {
+                const proxy = { 
+                    class: (value.constructor as ObjectConstructor).name,
+                    uuid : (value as Storable).uuid
+                };
+                value.save( cache )
+                return proxy;
+            } else {
+                return value;
             }
-
-            return value;
         };
 
         return JSON.stringify(e,replacer);            

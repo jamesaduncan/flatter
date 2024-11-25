@@ -1,18 +1,31 @@
 import Flatter from "./Flatter.ts";
 import { assert, assertEquals } from "jsr:@std/assert";
 
+interface IAddress {
+    street?: string;
+    city?  : string;
+    postcode? : string;
+}
 
 class Address extends Flatter {
     street : string = "";    
     city   : string  = "";
     postcode : string = "";
 
+    constructor( template? : IAddress ) {
+        super();
+        if (template) {
+            Object.assign(this, template)
+        }
+    }
+
     static override SQLDefinition = `
         CREATE TABLE ${this.tablename} (
             uuid UUID PRIMARY KEY NOT NULL,
             street TEXT,
             postcode TEXT,
-            city TEXT
+            city TEXT,
+            flatter OBJECT
         )
     `;
 
@@ -37,7 +50,7 @@ class User extends Flatter implements IUser {
     constructor( template? : IUser) {
         super();
         if (template) {
-            if (template.username) this.username = template.username
+            Object.assign( this, template );
         }
     }
 
@@ -48,7 +61,7 @@ class User extends Flatter implements IUser {
             created DATETIME,
             shippingAddress Address,
             flatter OBJECT,
-            FOREIGN KEY(shippingAddress) REFERENCES Addresses(uuid)
+            FOREIGN KEY(shippingAddress) REFERENCES Addresses(uuid) ON DELETE CASCADE
         );
     `;
 
@@ -57,10 +70,15 @@ class User extends Flatter implements IUser {
     }
 }
 
-const theUsername = 'johndoe';
+//const theUsername = 'johndoe';
 
-(new User({ username: 'bill'})).save();
-(new User({ username: 'brian'})).save();
+const bill = new User({ 
+    username: 'bill', 
+    shippingAddress: new Address({ street: '17 West Street', city: 'Wareham'} )
+});
+bill.save();
+console.log(bill);
+
 console.log( User.load({ username: 'bill'}) );
 
 /* test cases */
