@@ -7,9 +7,7 @@ import criterion from "npm:criterion";
 const sqllog = debug('flatter:sql');
 const flog   = debug('flatter:main');
 
-let DBConnection = new Database("flatter.sqlite");
-DBConnection.run('PRAGMA journal_mode = WAL;')        
-DBConnection.run('PRAGMA FOREIGN_KEY = ON;')        
+let DBConnection : Database;
 
 type TObjectLoadCache = {
     [key: string] : Storable;
@@ -26,7 +24,7 @@ type TDBTypeConversions = {
     [key: string] : TDBTypeConversion;
 }
 
-interface IRowInfo {
+type TRowInfo = {
     cid : string;
     name : string;
     type : string;
@@ -37,12 +35,12 @@ interface IRowInfo {
     fk? : object;
 }
 
-interface ITables {
-    [key : string] : ITableInfo;
+type TTables = {
+    [key : string] : TTableInfo;
 }
 
-interface ITableInfo {
-    [key : string] : IRowInfo;
+type TTableInfo = {
+    [key : string] : TRowInfo;
 }
 
 interface Storable {
@@ -56,12 +54,12 @@ type TTypeCache = {
     [key : string] : Loadable;
 }
 
-/* This defines the static interface for Flatter */
+/* This is the static interface for Flatter */
 interface Loadable {
     new() : Storable;
 
     SQLDefinition : string;
-    tableInfo : ITables;
+    tableInfo : TTables;
     DBTypeConversions : TDBTypeConversions;
     TypeCache : TTypeCache;
 
@@ -74,6 +72,7 @@ interface Loadable {
 
     init() : void;
 
+    useDatabase( aDatabase : string ) : void;
     useDatabase( aDatabase : Database ) : void;
 }
 
@@ -101,7 +100,6 @@ function log<This, Args extends unknown[], Return>(
     return replacementMethod;
 }
 
-
 function staticImplements<T>() {
     return <U extends T>(constructor: U) => { constructor };
 }
@@ -112,7 +110,7 @@ class Flatter {
 
     static SQLDefinition = "";
     static DBTypeConversions : TDBTypeConversions = {};
-    static tableInfo : ITables = ({} as ITables);
+    static tableInfo : TTables = ({} as TTables);
     static TypeCache : TTypeCache = {};
 
     private static DBTypes = {};
@@ -130,6 +128,11 @@ class Flatter {
     }
 
     static init() {
+
+        if (!DBConnection) {
+            Flatter.useDatabase("flatter.sqlite");
+        }
+
         const typename  = this.name;
         const tablename = this.tablename;
 
@@ -145,7 +148,7 @@ class Flatter {
 
         const info = DBConnection.prepare(`PRAGMA table_info(${tablename})`).all();
         info.forEach( (infoRow) => {
-            const castInfo : IRowInfo = (infoRow as IRowInfo);
+            const castInfo : TRowInfo = (infoRow as TRowInfo);
             this.tableInfo[typename]||= {};
             this.tableInfo[typename][ castInfo.name ] = castInfo;
         })
@@ -157,8 +160,14 @@ class Flatter {
         })
     }
 
-    static useDatabase( aDatabase : Database ) : void {
-        DBConnection = aDatabase;
+    static useDatabase( aDatabase : Database | string) : void {
+        if ( aDatabase instanceof Database ) {
+            DBConnection = aDatabase;
+        } else {
+            DBConnection = new Database("flatter.sqlite");
+        }
+        DBConnection.run('PRAGMA journal_mode = WAL;')        
+        DBConnection.run('PRAGMA FOREIGN_KEY = ON;')                    
     }
 
     static get dbColumns() : string[] {
@@ -169,7 +178,7 @@ class Flatter {
         const theClass = (this as Loadable);
         const typename = this.name;
         const tableInfoValues = Object.values(this.tableInfo[typename]);
-        return tableInfoValues.map( (e: IRowInfo) => {
+        return tableInfoValues.map( (e: TRowInfo) => {
             if ( this.tableInfo[ Pluralize.singular( e.type )]) {
                 // this is an object type, because it is a class/
                 const placeholder = theClass.DBTypeConversions["UUID"].toPlaceholder;
@@ -190,7 +199,7 @@ class Flatter {
         const theClass = (this.constructor as Loadable);
         const tableInfo = theClass.tableInfo;
 
-        return Object.values( tableInfo[theClass.name] ).map( ( row : IRowInfo ) : string => {            
+        return Object.values( tableInfo[theClass.name] ).map( ( row : TRowInfo ) : string => {            
             const value = Reflect.get(this, row.name);            
             const infoRow = theClass.DBTypeConversions[row.type];
             if (row.fk && value instanceof Flatter) {
