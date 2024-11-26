@@ -19,7 +19,7 @@ type TObjectLoadCache = {
 type TDBTypeConversion = {
     toPlaceholder? : string;
     toDBValue? ( e: unknown, cache? : TObjectLoadCache) : string | string;
-    toJSValue? ( e: string, cache? : TObjectLoadCache) : string | string;
+    toJSValue? ( e: string, cache? : TObjectLoadCache) : unknown;
 }
 
 type TDBTypeConversions = {
@@ -92,9 +92,9 @@ function log<This, Args extends unknown[], Return>(
     const methodName = String(context.name);
   
     function replacementMethod(this: This, ...args: Args): Return {
-      flog(`Entering method '${methodName}(${Deno.inspect(args)})'.`);
+      flog(`Entering '${methodName}(${Deno.inspect(args)})'.`);
       const result = target.call(this, ...args);
-      flog(`Exiting method '${methodName}'.`);
+      flog(`Exiting '${methodName}'.`);
       return result;
     }
   
@@ -202,7 +202,8 @@ class Flatter {
             }
             if (toDBValue) {
                 if ( typeof(toDBValue) == 'string' ) return toDBValue;
-                return toDBValue( value, cache );
+                const val = toDBValue( value, cache );
+                return val;
             }
             return '';
         })
@@ -274,6 +275,7 @@ class Flatter {
             flatter : string;
             [key : string] : unknown;
         }
+
         if ( row.flatter ) {
             row = JSON.parse( (row as FlatterObject).flatter, (_key : string, value : unknown, _context? : string) => {
                 if ( value instanceof Object) {
@@ -285,6 +287,8 @@ class Flatter {
                     const cachekey = (theValue.uuid as keyof object);
                     if ( !( cache[cachekey] )) {
                         const toCache = aClass.loadWithUUID( theValue.uuid, cache );
+                        /* I'm using reflect here because of a weird type error in typescript.
+                           I know its a bit of a hack, but it saves some shenanigans elsewhere. */
                         Reflect.set(cache, cachekey, (toCache as Storable));
                     }
                     return cache[cachekey];
@@ -294,13 +298,28 @@ class Flatter {
         }
 
         const entries = Object.entries( (row as object) );    
-        const objectProperties = Object.fromEntries( entries.map( ([k,v]) => {
-            return [ k, {
-                writable: true,
-                enumerable: true,
-                configurable: true,
-                value: v
-            }];
+        const objectProperties = Object.fromEntries( entries.map( ([k,v]) => {            
+            // here we need to check the data that we got out of the DB early on, and look
+            // for an appropriate type conversion (toJSValue). If it exists, we need to run
+            // it to get the value. If not, we can just use v, as it already does.
+            const tableInfo = this.tableInfo[this.name];
+            const rowType = tableInfo[k].type;
+            const typeConversion = this.DBTypeConversions[ rowType ];
+            if (typeConversion && typeConversion.toJSValue) {
+                return [ k, {
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                    value: typeConversion.toJSValue( v )
+                }];
+            } else {
+                return [ k, {
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                    value: v
+                }];
+            }
         }) );
         Reflect.set( cache, aUUID, Object.create(new this(), objectProperties))
         return cache[ aUUID as keyof object];
@@ -326,6 +345,8 @@ Flatter.declareDBType('UUID', {});
 Flatter.declareDBType('TEXT', {});
 Flatter.declareDBType('DATETIME', {
     toDBValue    : (e : unknown, _cache : TObjectLoadCache) : string => { return julian( e ) },
+// @ts-ignore: this is very definitely what I want to do, but it won't match a generic signature.
+    toJSValue    : (e) => { return new Date(e) ; }
 });
 Flatter.declareDBType('OBJECT', {
     toPlaceholder: 'json(?)',
