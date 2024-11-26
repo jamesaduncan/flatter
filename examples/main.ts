@@ -1,4 +1,4 @@
-import Flatter from "./Flatter.ts";
+import Flatter from "../Flatter.ts";
 //import { assert, assertEquals } from "jsr:@std/assert";
 
 interface IAddress {

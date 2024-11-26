@@ -1,4 +1,4 @@
-import Flatter from "./Flatter.ts"
+import Flatter from "../Flatter.ts"
 
 class Address extends Flatter {
     street   = "";    
