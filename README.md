@@ -15,5 +15,4 @@ into columns, and vice versa. Or at least, I think that's true. And that's the f
 
 This is where I've got to at 2254 on 20 Nov 2024:
 
-[X] DATETIME objects need to come out of the database as Date objects, rather than as astrings
-
+[ ] work out how I can do some runtime reflection to remove the static SQLDeclaration from classes
