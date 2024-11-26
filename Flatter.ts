@@ -1,8 +1,8 @@
 import { Database } from "jsr:@db/sqlite@0.11";
-import Pluralize from "jsr:@wei/pluralize";
+import Pluralize from "jsr:@wei/pluralize@8.0.2";
 import julian from "npm:julian@0.2.0";
-import debug from "npm:debug";
-import criterion from "npm:criterion";
+import debug from "npm:debug@4.3.7";
+import criterion from "npm:criterion@0.4.0-rc.1";
 
 const sqllog = debug('flatter:sql');
 const flog   = debug('flatter:main');
@@ -115,7 +115,7 @@ class Flatter {
 
     private static DBTypes = {};
 
-    get flatter () {
+    get flatter () : Flatter {
         return this;
     }
 
