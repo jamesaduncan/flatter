@@ -15,10 +15,6 @@
  *
  * ## Usage:
  *
- * ### Define a Table:
- * Create a class that extends Flatter and provides a `SQLDefinition` static
- * property to define the corresponding SQLite table schema.
- *
  * ### Save and Load:
  * Create objects, populate them with data, call `save` to persist, and use
  * `loadWithUUID` or `load` to retrieve data from the database.
@@ -37,16 +33,6 @@
  *     if (template) Object.assign(this, template);
  *   }
  *
- *   static SQLDefinition = `
- *     CREATE TABLE ${this.tablename} (
- *       uuid UUID PRIMARY KEY NOT NULL,
- *       street TEXT,
- *       postcode TEXT,
- *       city TEXT,
- *       flatter OBJECT
- *     );
- *   `;
- *
  *   static {
  *     this.init();
  *   }
@@ -61,17 +47,6 @@
  *     super();
  *     if (template) Object.assign(this, template);
  *   }
- *
- *   static SQLDefinition = `
- *     CREATE TABLE ${this.tablename} (
- *       uuid UUID PRIMARY KEY NOT NULL,
- *       username TEXT UNIQUE NOT NULL,
- *       created DATETIME,
- *       shippingAddress Address,
- *       flatter OBJECT,
- *       FOREIGN KEY(shippingAddress) REFERENCES Addresses(uuid) ON DELETE CASCADE
- *     );
- *   `;
  *
  *   static {
  *     this.init();
@@ -100,6 +75,8 @@ import Pluralize from "jsr:@wei/pluralize@8.0.2";
 import julian from "npm:julian@0.2.0";
 import debug from "npm:debug@4.3.7";
 import criterion from "npm:criterion@0.4.0-rc.1";
+import * as acorn from "npm:acorn";
+import pluralize from "jsr:@wei/pluralize";
 
 /* some convenience methods for debugging */
 const sqllog = debug('flatter:sql');
@@ -156,7 +133,6 @@ type TTypeCache = {
 interface Loadable {
     new() : Storable;
 
-    SQLDefinition : string;
     tableInfo : TTables;
     DBTypeConversions : TDBTypeConversions;
     TypeCache : TTypeCache;
@@ -165,6 +141,8 @@ interface Loadable {
     get dbColumns() : string[];
     get dbPlaceholders() : string[];
 
+    get database() : Database;
+
     load( criteria : object, cache? : object) : Storable[];
     loadWithUUID( aUUID : string, cache? : object) : Storable;
 
@@ -172,6 +150,7 @@ interface Loadable {
 
     useDatabase( aDatabase : string ) : void;
     useDatabase( aDatabase : Database ) : void;
+
 }
 
 type TProxy = {
@@ -212,59 +191,6 @@ class Flatter {
     uuid: string;
 
     /**
-     * Defines the SQL schema for the database table associated with the class.
-     *
-     * The `SQLDefinition` static field specifies the SQL `CREATE TABLE` statement used
-     * to define the structure of the database table corresponding to the class. This
-     * includes the table name, columns, data types, constraints, and any relationships
-     * with other tables.
-     *
-     * ## Behavior:
-     * - Used during the initialization process (`init()`) to create the table in the SQLite database
-     *   if it does not already exist.
-     * - Supports features like primary keys, foreign keys, and JSON fields for nested objects.
-     *
-     * @type {string}
-     *
-     * @example
-     * ```typescript
-     * class User extends Flatter {
-     *   username = "";
-     *   created = new Date();
-     *   shippingAddress = new Address();
-     *
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       username TEXT UNIQUE NOT NULL,
-     *       created DATETIME,
-     *       shippingAddress Address,
-     *       flatter OBJECT,
-     *       FOREIGN KEY(shippingAddress) REFERENCES Addresses(uuid) ON DELETE CASCADE
-     *     );
-     *   `;
-     *
-     *   static {
-     *     this.init();
-     *   }
-     * }
-     *
-     * console.log(User.SQLDefinition);
-     * // Outputs the SQL schema for the User table
-     * ```
-     *
-     * @remarks
-     * - Subclasses of `Flatter` must define this static field to describe their table schema.
-     * - The placeholder `${this.tablename}` should be used to dynamically insert the table name
-     *   based on the class name.
-     * - Ensure compatibility with SQLite syntax when writing the schema.
-     *
-     * @see {@link init} - Uses the `SQLDefinition` to create the table if it doesn't exist.
-     * @see {@link tablename} - Provides the table name for use in the SQL schema.
-     */
-    static SQLDefinition = "";
-
-    /**
      * Maps database data types to their corresponding conversion logic for serialization and deserialization.
      *
      * The `DBTypeConversions` static field defines the conversion rules for translating between SQLite
@@ -290,14 +216,6 @@ class Flatter {
      * class User extends Flatter {
      *   username = "";
      *   created = new Date();
-     *
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       username TEXT UNIQUE NOT NULL,
-     *       created DATETIME
-     *     );
-     *   `;
      *
      *   static {
      *     this.init();
@@ -334,14 +252,6 @@ class Flatter {
      * class User extends Flatter {
      *   username = "";
      *   created = new Date();
-     *
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       username TEXT UNIQUE NOT NULL,
-     *       created DATETIME
-     *     );
-     *   `;
      *
      *   static {
      *     this.init();
@@ -408,7 +318,6 @@ class Flatter {
      *
      * @see {@link declareDBType} - Method to register additional database types.
      * @see {@link DBTypeConversions} - Uses `DBTypes` to define type conversion logic.
-     * @see {@link SQLDefinition} - Relies on `DBTypes` to interpret column data types in schema definitions.
      */
     private static DBTypes = {};
 
@@ -431,15 +340,11 @@ class Flatter {
      * class User extends Flatter {
      *   username = "";
      *   profile = { bio: "Hello, world!", age: 30 };
-     *
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       username TEXT UNIQUE NOT NULL,
-     *       flatter OBJECT
-     *     );
-     *   `;
-     *
+     * 
+     *   constructor( aTemplate ) {
+     *      if (aTemplate) Object.assign(this, aTemplate); 
+     *   }
+     * 
      *   static {
      *     this.init();
      *   }
@@ -474,12 +379,6 @@ class Flatter {
      * @example
      * ```typescript
      * class User extends Flatter {
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       username TEXT UNIQUE NOT NULL
-     *     );
-     *   `;
      *
      *   static {
      *     this.init();
@@ -493,7 +392,6 @@ class Flatter {
      * - This getter is static and should be accessed directly from the class (e.g., `User.tablename`).
      * - Relies on the `Pluralize` library to handle pluralization, which covers common English rules but may not handle all edge cases.
      *
-     * @see {@link SQLDefinition} - Utilizes the table name to define the schema.
      * @see {@link init} - Uses the table name to initialize the database metadata.
      */
     static get tablename() : string {
@@ -533,8 +431,9 @@ class Flatter {
      *
      * @throws {Error} - Throws an error if UUID generation fails, though this is highly unlikely.
      */
-    constructor() {
-        this.uuid = crypto.randomUUID();        
+    constructor( aTemplate? : object ) {
+        this.uuid = crypto.randomUUID();
+        if (aTemplate) Object.assign(this, aTemplate);
     }
 
     /**
@@ -543,12 +442,13 @@ class Flatter {
      * This method is intended to be called in a static block for each subclass of `Flatter`.
      * It performs the following tasks:
      * - Ensures the SQLite database connection is established.
-     * - Checks if the corresponding database table exists; if not, creates it using the `SQLDefinition`.
+     * - Checks if the corresponding database table exists; if not, creates it by parsing the class definition.
      * - Retrieves and caches the table's schema information, including columns and foreign key constraints.
      * - Registers the class in the `TypeCache` for use during serialization and deserialization.
      *
      * ## Behavior:
-     * - Uses the `tablename` and `SQLDefinition` static properties of the class to define and query the database schema.
+     * - Uses the `tablename` property of the class to define and query the database schema.
+     * - Uses `acorn` to parse the source code of the class definition to generate the database schema if it doesn't exist.
      * - Caches the table schema and foreign key metadata for efficient database interactions.
      *
      * @throws {Error} - Throws an error if the database connection cannot be established or queried.
@@ -559,16 +459,6 @@ class Flatter {
      *   street = "";
      *   city = "";
      *   postcode = "";
-     *
-     *   static SQLDefinition = `
-     *     CREATE TABLE ${this.tablename} (
-     *       uuid UUID PRIMARY KEY NOT NULL,
-     *       street TEXT,
-     *       postcode TEXT,
-     *       city TEXT,
-     *       flatter OBJECT
-     *     );
-     *   `;
      *
      *   static {
      *     this.init();
@@ -581,17 +471,80 @@ class Flatter {
      * - If the table already exists, it does not modify the schema but updates the cached metadata.
      *
      * @see {@link useDatabase} - Ensures the database connection is set before initialization.
-     * @see {@link SQLDefinition} - Used to define the table structure during initialization.
      * @see {@link tablename} - Determines the table name for the current class.
      */
     static init() {
+        const typename  = this.name;
+        const tablename = this.tablename;
+
+        const thisSource = this.toString();
+        //const model = cherow.parse( thisSource );
+        const model = acorn.parse( thisSource, { ecmaVersion: 2023, allowReserved: true } );
+//        console.log(model);
+        // @ts-ignore: this is what I want to do. It's ok. If it won't parse then it will fail with what I want it to fail with
+        const properties = model.body.at(0)?.body?.body.filter( e => e.type == 'PropertyDefinition' );
+        const propertyObjects = Object.fromEntries( properties.map( (e : unknown) => {
+// @ts-ignore: this really is what I want to do, and its ok.
+            return [ e.key.name, e.value ];
+        }) );
+
+        let sqlDefinition : string = "";
+
+        const astTypeTranslation = {
+            'String': "TEXT",
+            'Date': "DATETIME",
+            'Integer': 'INTEGER',
+            'Float': 'REAL',
+            'OBJECT': 'OBJECT'
+        };
+
+        /* @ts-ignore: hairy, but intended. We're dealing with the AST here, and it is a bit complex! */
+        {
+            sqlDefinition = `CREATE TABLE ${tablename} (\n`;
+            const sqlFields = [ [ 'uuid', 'UUID PRIMARY KEY NOT NULL' ] ];
+
+            const isNumber = function isNumber(value : unknown) {
+                return typeof value === 'number';
+            };
+
+            sqlFields.push( ...Object.entries( propertyObjects ).map( ( [key, value] ) => {
+                if ( value.type == 'Literal' ) {
+                    if ( !isNumber( value.value )) {
+                        return [ key, 'String' ];
+                    } else {
+                        if ( parseInt( value.value )) return [ key, 'Integer' ];
+                        else return [key, 'Float' ];
+                    }
+                } else if ( value.type == 'ObjectExpression' || value.type == 'ArrayExpression') {
+                    return [ key, 'OBJECT' ]
+                }
+                return [key, value.callee?.name || value];
+            }) );
+            sqlFields.push( ['flatter', 'OBJECT'])
+
+            const fks : string[][] = [];
+            sqlDefinition += sqlFields.map( ([ key, type ]) => {
+                if ( astTypeTranslation[(type as keyof object)] ) {
+                    return `\t${key} ${ astTypeTranslation[(type as keyof object)]}`
+                } else {
+                    if (key != 'uuid') fks.push([key, type]);
+                    return `\t${key} ${type}`;
+                }
+            }).join(",\n");
+
+            if (fks.length) sqlDefinition += ",\n";
+            sqlDefinition += fks.map( ([key, type ]) => {
+                //console.log(type);
+                return `\tFOREIGN KEY(${key}) REFERENCES ${pluralize(type)}(uuid)`
+            }).join(", ");
+
+            sqlDefinition += `\n)`;
+        }
 
         if (!DBConnection) {
             Flatter.useDatabase("flatter.sqlite");
         }
 
-        const typename  = this.name;
-        const tablename = this.tablename;
 
         this.TypeCache[typename] = this;
 
@@ -600,7 +553,7 @@ class Flatter {
         const tableDetails = DBConnection.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='${tablename}'`).get();
         if (!tableDetails) {
             /* we need to set up the table */
-            DBConnection.run( this.SQLDefinition );
+            DBConnection.run( sqlDefinition );
         }
 
         const info = DBConnection.prepare(`PRAGMA table_info(${tablename})`).all();
@@ -654,6 +607,10 @@ class Flatter {
         }
         DBConnection.run('PRAGMA journal_mode = WAL;')        
         DBConnection.run('PRAGMA FOREIGN_KEY = ON;')                    
+    }
+
+    static get database() : Database {
+        return DBConnection;
     }
 
     /**
@@ -894,9 +851,9 @@ class Flatter {
             sqllog(release)
             DBConnection.exec(release);
         } catch(e) {
-            console.log(e);
             sqllog(rollback)
             DBConnection.exec(rollback);
+            throw e; // we re-throw e so that the ORM consumer can act upon the failure.
         }        
     }
 
@@ -1041,7 +998,6 @@ class Flatter {
      * ## Behavior:
      * - Registers the custom type in the `DBTypeConversions` static field.
      * - Specifies how to transform the type between JavaScript and SQLite formats.
-     * - Enables the use of the custom type in `SQLDefinition` and during object persistence.
      *
      * @param {string} aType - The name of the custom database type (e.g., `UUID`, `JSON`, `DATETIME`).
      * @param {TDBTypeConversion} aDefinition - An object defining the conversion logic for the type:
@@ -1059,7 +1015,6 @@ class Flatter {
      * - Existing types should not be redefined to avoid inconsistencies.
      *
      * @see {@link DBTypeConversions} - Stores the declared types and their conversion logic.
-     * @see {@link SQLDefinition} - Custom types can be used in table definitions.
      * @see {@link dbValues} - Uses the declared types to handle value serialization.
      */
     static declareDBType( aType : string, aDefinition : TDBTypeConversion) : void {
