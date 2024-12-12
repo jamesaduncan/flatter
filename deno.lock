@@ -19,6 +19,7 @@
     "jsr:@wei/pluralize@8.0.2": "8.0.2",
     "npm:@deepkit/type@*": "1.0.1-alpha.155_@deepkit+core@1.0.1-alpha.154",
     "npm:acorn@*": "8.14.0",
+    "npm:acorn@8.14.0": "8.14.0",
     "npm:cherow@*": "1.6.9",
     "npm:criterion@*": "0.4.0-rc.1",
     "npm:criterion@0.4.0-rc.1": "0.4.0-rc.1",

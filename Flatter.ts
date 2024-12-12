@@ -75,8 +75,7 @@ import Pluralize from "jsr:@wei/pluralize@8.0.2";
 import julian from "npm:julian@0.2.0";
 import debug from "npm:debug@4.3.7";
 import criterion from "npm:criterion@0.4.0-rc.1";
-import * as acorn from "npm:acorn";
-import pluralize from "jsr:@wei/pluralize";
+import * as acorn from "npm:acorn@8.14.0";
 
 /* some convenience methods for debugging */
 const sqllog = debug('flatter:sql');
@@ -535,7 +534,7 @@ class Flatter {
             if (fks.length) sqlDefinition += ",\n";
             sqlDefinition += fks.map( ([key, type ]) => {
                 //console.log(type);
-                return `\tFOREIGN KEY(${key}) REFERENCES ${pluralize(type)}(uuid)`
+                return `\tFOREIGN KEY(${key}) REFERENCES ${Pluralize(type)}(uuid)`
             }).join(", ");
 
             sqlDefinition += `\n)`;
