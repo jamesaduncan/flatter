@@ -48,5 +48,4 @@ class User extends Flatter implements IUser {
     }
 }
 
-const user = new User();
 

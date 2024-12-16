@@ -53,10 +53,10 @@ Deno.test({
         assert(uuid.validate(record.shippingAddress));
     },
 });
-    //
-let billout = User.loadWithUUID( record.uuid );
+
+const billout = User.loadWithUUID( record.uuid );
 Deno.test({
-    name: "test loading of record as ORM load",
+    name: "test loading of record as ORM loadWithUUID",
     fn() {
         assert(billout.username == bill.username);
         assert(billout.uuid == bill.uuid);
@@ -64,7 +64,16 @@ Deno.test({
         assert(billout.shippingAddress.street = bill.shippingAddress.street);
     }
 })
-//console.log( User.loadWithUUID( bill.uuid ) );
 
-let billun = (User.load({ username: 'bill' }))[0];
-//console.log(billun);
+
+const billun = (User.load({ username: 'bill' }))[0];
+Deno.test({
+    name: "test loading of record as ORM query load",
+    fn() {
+        assert(billun.username == bill.username);
+        assert(billun.uuid == bill.uuid);
+        assert(billun.shippingAddress instanceof Address);
+        assert(billun.shippingAddress.street = bill.shippingAddress.street);
+    }
+})
+
