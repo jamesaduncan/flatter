@@ -40,7 +40,7 @@ const bill = new User({
     username: 'bill', 
     shippingAddress: new Address({ street: '17 West Street', city: 'Wareham'})
 });
-
+const aUUID = bill.uuid;
 bill.save();
 
 const record = Flatter.database.prepare(`SELECT * FROM users WHERE username = 'bill'`).get();
@@ -54,10 +54,10 @@ Deno.test({
     },
 });
 
-const billout = User.loadWithUUID( record.uuid );
 Deno.test({
     name: "test loading of record as ORM loadWithUUID",
     fn() {
+        const billout = User.loadWithUUID( record.uuid );
         assert(billout.username == bill.username);
         assert(billout.uuid == bill.uuid);
         assert(billout.shippingAddress instanceof Address);
@@ -66,14 +66,31 @@ Deno.test({
 })
 
 
-const billun = (User.load({ username: 'bill' }))[0];
+//console.log(billun)
 Deno.test({
     name: "test loading of record as ORM query load",
     fn() {
+        const billun = (User.load({ uuid: record.uuid }))[0];
         assert(billun.username == bill.username);
         assert(billun.uuid == bill.uuid);
         assert(billun.shippingAddress instanceof Address);
         assert(billun.shippingAddress.street = bill.shippingAddress.street);
     }
 })
+
+Deno.test({
+    name: "re-save record with no problem",
+    fn() {
+        const thebill = User.loadWithUUID( aUUID );
+        assert(thebill);
+        thebill.username = "bob";
+        thebill.save();
+        const record2 = Flatter.database.prepare(`SELECT * FROM users WHERE uuid = ?`).get(aUUID);
+        assert(record2.username == 'bob');
+        assert(record2.shippingAddress);
+        assert(uuid.validate(record.uuid));
+        assert(uuid.validate(record.shippingAddress));
+        assert(record2.uuid == record.uuid);
+    },
+});
 
