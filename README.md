@@ -20,3 +20,4 @@ class definition, and then I'm processing the AST that it spits out to generate 
 This is where I've got to at 1217 on December 12, 2024:
 
 [ ] Work out how to do migrations
+[ ] Whoops! delete!
